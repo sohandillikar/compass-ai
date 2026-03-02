@@ -59,7 +59,7 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 w-full flex-col">
       <header className="shrink-0 border-b border-primary/40 bg-primary px-6 py-4 text-primary-foreground shadow-sm">
         <div className="flex flex-col gap-3">
           <div
