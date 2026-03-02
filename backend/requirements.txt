@@ -1,0 +1,8 @@
+# CLI agent + API server
+langchain
+langchain-openai
+supabase
+python-dotenv
+rapidfuzz
+fastapi
+uvicorn[standard]
