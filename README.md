@@ -84,7 +84,7 @@ The following is a list of example requests that Compass can handle:
 - "Who are the top-rated biology professors?"
 - "I learn best from professors who use lots of real-world examples"
 - "Which math professor has the lightest workload?"
-- "Tell me about Professor Sarah Chen"
+- "Tell me about Professor Alexander Aue"
 - "I want a challenging upper-division course, who should I look for?"
 - "Are there any really engaging lecturers in the psychology department?"
 - "Who teaches MAT 21A and how are they rated?"

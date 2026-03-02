@@ -12,7 +12,7 @@ import { chat, type ChatMessage } from "@/lib/api";
 
 const EXAMPLE_PROMPTS = [
   "Who's the best professor for ECS 36C?",
-  "Tell me about Professor Sarah Chen",
+  "Tell me about Professor Alexander Aue",
 ];
 
 export function ChatInterface() {
