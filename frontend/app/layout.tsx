@@ -1,22 +1,18 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const aggieSans = Source_Sans_3({
+  variable: "--font-aggie-sans",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: ["400", "600"],
 });
 
 export const metadata: Metadata = {
   title: "Compass AI",
   description: "Compass AI",
   icons: {
-    icon: "/compass.png",
+    icon: "/aggie.png",
   },
 };
 
@@ -27,9 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${aggieSans.variable} antialiased min-h-dvh overflow-hidden`}>
         {children}
       </body>
     </html>

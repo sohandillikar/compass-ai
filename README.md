@@ -79,7 +79,6 @@ The following is a list of example requests that Compass can handle:
 
 - "Who's the best professor for ECS 36C?"
 - "I need to take a computer science elective, who should I take it with?"
-- "Compare Professor Johnson and Professor Martinez for ECS 50"
 - "I want an easy A for my GE requirement"
 - "Who are the top-rated biology professors?"
 - "I learn best from professors who use lots of real-world examples"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from backend.main import ChatMessage, _to_api_messages
+from main import ChatMessage, _to_api_messages
 
 
 def _human(content):
