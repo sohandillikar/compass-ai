@@ -3,11 +3,51 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Send } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { createPortal } from "react-dom";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { chat, type ChatMessage } from "@/lib/api";
+
+type UIMessage = ChatMessage & { id: string };
+
+function makeId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
+}
+
+function normalizeContent(content: string) {
+  return content.trim();
+}
+
+function reconcileMessages(prev: UIMessage[], next: ChatMessage[]): UIMessage[] {
+  return next.map((msg, idx) => {
+    const prevMsg = prev[idx];
+    if (
+      prevMsg &&
+      prevMsg.role === msg.role &&
+      normalizeContent(prevMsg.content) === normalizeContent(msg.content)
+    ) {
+      return { ...prevMsg, content: msg.content };
+    }
+    return { ...msg, id: makeId() };
+  });
+}
+
+type Rect = Pick<DOMRect, "left" | "top" | "width" | "height">;
+
+function rectFromDomRect(rect: DOMRect): Rect {
+  return {
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+  };
+}
 
 const EXAMPLE_PROMPTS = [
   "Who's the best professor for ECS 36C?",
@@ -15,34 +55,123 @@ const EXAMPLE_PROMPTS = [
 ];
 
 export function ChatInterface() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<UIMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const bubbleRefs = useRef(new Map<string, HTMLDivElement>());
+  const shouldReduceMotion = useReducedMotion();
+  const [isMounted, setIsMounted] = useState(false);
+
+  const [hiddenMessageIds, setHiddenMessageIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [sendOverlay, setSendOverlay] = useState<{
+    messageId: string;
+    content: string;
+    from: Rect;
+    to: Rect;
+  } | null>(null);
+  const pendingSendRef = useRef<{
+    messageId: string;
+    content: string;
+    fromRect: Rect;
+  } | null>(null);
+  const animatingRef = useRef(false);
 
   const scrollToBottom = useCallback(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    scrollRef.current?.scrollIntoView({
+      behavior: animatingRef.current ? "instant" : "smooth",
+    });
   }, []);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (shouldReduceMotion) {
+      pendingSendRef.current = null;
+      setSendOverlay(null);
+      setHiddenMessageIds(new Set());
+    }
+  }, [shouldReduceMotion]);
+
+  useEffect(() => {
+    if (shouldReduceMotion) return;
+    if (sendOverlay) return;
+    const pending = pendingSendRef.current;
+    if (!pending) return;
+
+    const raf = requestAnimationFrame(() => {
+      const bubbleEl = bubbleRefs.current.get(pending.messageId);
+      if (!bubbleEl) return;
+
+      const toRect = rectFromDomRect(bubbleEl.getBoundingClientRect());
+      const startLeft = pending.fromRect.left + pending.fromRect.width - toRect.width;
+      const startTop =
+        pending.fromRect.top + (pending.fromRect.height - toRect.height) / 2;
+      const fromRect: Rect = {
+        left: startLeft,
+        top: startTop,
+        width: toRect.width,
+        height: toRect.height,
+      };
+
+      setSendOverlay({
+        messageId: pending.messageId,
+        content: pending.content,
+        from: fromRect,
+        to: toRect,
+      });
+      pendingSendRef.current = null;
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [messages, sendOverlay, shouldReduceMotion]);
+
   const handleSubmit = async (overrideText?: string) => {
     const text = (overrideText ?? input).trim();
     if (!text || isLoading) return;
 
-    const userMessage: ChatMessage = { role: "user", content: text };
-    const newMessages = [...messages, userMessage];
+    const userMessage: UIMessage = { id: makeId(), role: "user", content: text };
+    const newMessages: UIMessage[] = [...messages, userMessage];
     setMessages(newMessages);
     setInput("");
     setError(null);
     setIsLoading(true);
 
+    if (!shouldReduceMotion) {
+      const fromEl = textareaRef.current;
+      if (fromEl) {
+        animatingRef.current = true;
+        pendingSendRef.current = {
+          messageId: userMessage.id,
+          content: userMessage.content,
+          fromRect: rectFromDomRect(fromEl.getBoundingClientRect()),
+        };
+        setHiddenMessageIds((prev) => {
+          const next = new Set(prev);
+          next.add(userMessage.id);
+          return next;
+        });
+      }
+    }
+
+    const outgoingMessages: ChatMessage[] = newMessages.map(({ role, content }) => ({
+      role,
+      content,
+    }));
+
     try {
-      const res = await chat(newMessages);
-      setMessages(res.messages);
+      const res = await chat(outgoingMessages);
+      setMessages((prev) => reconcileMessages(prev, res.messages));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
       setMessages(newMessages);
@@ -123,26 +252,51 @@ export function ChatInterface() {
             .filter(
               (msg) =>
                 msg.role !== "assistant" ||
-                (msg.content ?? "").trim() !== ""
+                msg.content.trim() !== ""
             )
-            .map((msg, i) => (
+            .map((msg) => (
               <div
-                key={i}
+                key={msg.id}
                 className={cn(
                   "flex",
                   msg.role === "user" ? "justify-end" : "justify-start"
                 )}
               >
                 {msg.role === "user" ? (
-                  <div className="bg-primary text-primary-foreground max-w-[85%] rounded-3xl px-4 py-2.5 shadow-sm">
+                  <div
+                    ref={(el) => {
+                      if (!el) {
+                        bubbleRefs.current.delete(msg.id);
+                        return;
+                      }
+                      bubbleRefs.current.set(msg.id, el);
+                    }}
+                    className={cn(
+                      "bg-primary text-primary-foreground max-w-[85%] rounded-3xl px-4 py-2.5 shadow-sm",
+                      hiddenMessageIds.has(msg.id) && "opacity-0"
+                    )}
+                  >
                     {msg.content}
                   </div>
                 ) : (
-                  <div className="bg-card max-w-[85%] rounded-3xl border border-border/70 px-4 py-3 shadow-xs">
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                      {msg.content}
-                    </p>
-                  </div>
+                  shouldReduceMotion ? (
+                    <div className="bg-card max-w-[85%] rounded-3xl border border-border/70 px-4 py-3 shadow-xs">
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                        {msg.content}
+                      </p>
+                    </div>
+                  ) : (
+                    <motion.div
+                      className="bg-card max-w-[85%] rounded-3xl border border-border/70 px-4 py-3 shadow-xs"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                    >
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                        {msg.content}
+                      </p>
+                    </motion.div>
+                  )
                 )}
               </div>
             ))}
@@ -157,6 +311,43 @@ export function ChatInterface() {
         </div>
       </div>
 
+      {!shouldReduceMotion &&
+        isMounted &&
+        sendOverlay &&
+        createPortal(
+          <motion.div
+            aria-hidden="true"
+            className="bg-primary text-primary-foreground pointer-events-none fixed z-50 max-w-[85vw] rounded-3xl px-4 py-2.5 shadow-sm"
+            style={{
+              left: sendOverlay.from.left,
+              top: sendOverlay.from.top,
+              width: sendOverlay.from.width,
+            }}
+            initial={{ x: 0, y: 0, scale: 1, opacity: 1 }}
+            animate={{
+              x: sendOverlay.to.left - sendOverlay.from.left,
+              y: sendOverlay.to.top - sendOverlay.from.top,
+              scale: 1,
+            }}
+            transition={{
+              duration: 0.45,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+            onAnimationComplete={() => {
+              animatingRef.current = false;
+              setHiddenMessageIds((prev) => {
+                const next = new Set(prev);
+                next.delete(sendOverlay.messageId);
+                return next;
+              });
+              setSendOverlay(null);
+            }}
+          >
+            {sendOverlay.content}
+          </motion.div>,
+          document.body
+        )}
+
       {error && (
         <div className="shrink-0 border-t border-destructive/30 bg-destructive/10 px-6 py-2">
           <p className="text-destructive text-sm">{error}</p>
@@ -166,6 +357,7 @@ export function ChatInterface() {
       <div className="shrink-0 border-t border-border/50 bg-background/80 p-4 backdrop-blur-sm">
         <div className="flex gap-2">
           <Textarea
+            ref={textareaRef}
             placeholder="Ask about professors or courses..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
