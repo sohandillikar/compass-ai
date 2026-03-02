@@ -60,20 +60,32 @@ export function ChatInterface() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="shrink-0 border-b border-border/50 bg-background/80 px-6 py-4 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
-          <Image
-            src="/compass.png"
-            alt=""
-            width={32}
-            height={32}
-            className="dark:invert"
-          />
-          <div>
-            <h1 className="text-xl font-semibold">Compass AI</h1>
-            <p className="text-muted-foreground text-sm">
-              Ask about UC Davis professors and courses
-            </p>
+      <header className="shrink-0 border-b border-primary/40 bg-primary px-6 py-4 text-primary-foreground shadow-sm">
+        <div className="flex flex-col gap-3">
+          <div
+            className="flex items-center gap-2"
+            aria-hidden="true"
+          >
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#ff605c] ring-1 ring-black/20 sm:h-3 sm:w-3" />
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#ffbd44] ring-1 ring-black/20 sm:h-3 sm:w-3" />
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#00ca4e] ring-1 ring-black/20 sm:h-3 sm:w-3" />
+          </div>
+          <div className="flex items-center gap-4">
+            <Image
+              src="/aggie.png"
+              alt="UC Davis Aggies logo"
+              width={64}
+              height={40}
+              className="h-10 w-10"
+            />
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight">
+                Compass AI
+              </h1>
+              <p className="text-sm text-primary-foreground/80">
+                Ask about UC Davis professors and courses
+              </p>
+            </div>
           </div>
         </div>
       </header>
@@ -83,11 +95,11 @@ export function ChatInterface() {
           {messages.length === 0 && (
             <div className="flex flex-col items-center gap-6 py-12">
               <Image
-                src="/compass.png"
-                alt=""
-                width={64}
-                height={64}
-                className="text-muted-foreground opacity-60 dark:invert dark:opacity-50"
+                src="/uc_davis.png"
+                alt="UC Davis wordmark"
+                width={164}
+                height={164}
+                className="opacity-90"
               />
               <p className="text-muted-foreground text-center text-sm">
                 Start a conversation by asking about professors or courses.
@@ -99,7 +111,7 @@ export function ChatInterface() {
                     type="button"
                     onClick={() => handleSubmit(prompt)}
                     disabled={isLoading}
-                    className="rounded-full border border-border/60 bg-muted/40 px-4 py-2 text-sm text-foreground/90 transition-colors hover:bg-muted/60 hover:border-border disabled:opacity-50"
+                    className="rounded-full border border-accent/30 bg-background/80 px-4 py-2 text-sm text-primary/90 shadow-xs transition-colors hover:border-accent/60 hover:bg-accent/10 disabled:opacity-50"
                   >
                     {prompt}
                   </button>
@@ -114,24 +126,26 @@ export function ChatInterface() {
                 (msg.content ?? "").trim() !== ""
             )
             .map((msg, i) => (
-            <div
-              key={i}
-              className={cn(
-                "flex",
-                msg.role === "user" ? "justify-end" : "justify-start"
-              )}
-            >
-              {msg.role === "user" ? (
-                <div className="bg-primary text-primary-foreground max-w-[85%] rounded-2xl px-4 py-2.5">
-                  {msg.content}
-                </div>
-              ) : (
-                <div className="bg-muted/50 border-border/50 max-w-[85%] rounded-2xl border px-4 py-3">
-                  <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
-                </div>
-              )}
-            </div>
-          ))}
+              <div
+                key={i}
+                className={cn(
+                  "flex",
+                  msg.role === "user" ? "justify-end" : "justify-start"
+                )}
+              >
+                {msg.role === "user" ? (
+                  <div className="bg-primary text-primary-foreground max-w-[85%] rounded-3xl px-4 py-2.5 shadow-sm">
+                    {msg.content}
+                  </div>
+                ) : (
+                  <div className="bg-card max-w-[85%] rounded-3xl border border-border/70 px-4 py-3 shadow-xs">
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                      {msg.content}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ))}
           {isLoading && (
             <div className="flex justify-start">
               <div className="bg-muted/50 border-border/50 max-w-[85%] rounded-2xl border px-4 py-3">
