@@ -15,7 +15,7 @@ from supabase import create_client, Client
 load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
 
 SUPABASE_URL        = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_KEY")  # must be service-role, not anon
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SECRET_KEY")  # must be service-role, not anon
 PROFESSORS_CSV      = os.getenv("PROFESSORS_CSV", "ucdavis_professors.csv")
 REVIEWS_CSV         = os.getenv("REVIEWS_CSV",    "ucdavis_professor_reviews.csv")
 BATCH_SIZE          = int(os.getenv("BATCH_SIZE", "500"))
