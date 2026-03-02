@@ -95,7 +95,8 @@ def _fetch_reviews_for_course(course_query: str, limit: int = 5000) -> list[dict
 
     # Supabase/PostgREST OR filter syntax: "col.op.value,col.op.value"
     # We keep it broad; final matching is done locally using normalize_course.
-    or_filter = ",".join([f"course.ilike.%{v}%" for v in variants[:6]])
+    # Use more variants now that course_variants() includes padded/unpadded forms.
+    or_filter = ",".join([f"course.ilike.%{v}%" for v in variants[:12]])
 
     q = (
         supabase.table("reviews")

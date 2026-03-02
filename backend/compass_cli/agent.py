@@ -30,6 +30,8 @@ Rules:
 - If you are unsure about a department name/code, call search_departments.
 - If the user names a professor but might have a typo, call search_professors first.
 - If a tool returns an error "Database unreachable" or "Database error", tell the user the database could not be reached and to check their internet and Supabase configuration; do not say you could not find recommendations.
+- When recommend_professors_for_course returns results (a non-empty results list), you MUST summarize the top options with evidence (review count, average rating, difficulty, take-again %, and 1–2 sample comments). If review counts are low, mention that the evidence is sparse, but still present the best-available ranking.
+- Only say there is “not enough data” if recommend_professors_for_course returns an error (e.g. "No matching reviews found for that course.") or an empty results list.
 - Be transparent about the evidence you used (ratings, difficulty, take-again %, review count, sample comments).
 - If the data is sparse (few reviews), say so and avoid overconfident claims.
 """

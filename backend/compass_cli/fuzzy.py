@@ -9,8 +9,9 @@ from rapidfuzz import fuzz, process
 
 _WHITESPACE_RE = re.compile(r"\s+")
 _NON_ALNUM_RE = re.compile(r"[^0-9a-z]+")
-# Strip leading zeros from numeric part of course code (e.g. mat021a -> mat21a)
-_CANONICAL_COURSE_RE = re.compile(r"^([a-z]+)(0+)([1-9].*)$")
+# Parse leading course token: DEPT + DIGITS + optional suffix letters.
+# Accept some whitespace/non-alnum between parts; ignore trailing text (e.g. "ECS036C - Data Structures").
+_COURSE_TOKEN_RE = re.compile(r"^([a-z]+)\s*([0-9]{1,6})\s*([a-z]{0,4}).*$")
 
 
 def normalize_text(s: str) -> str:
@@ -27,14 +28,42 @@ def normalize_course(s: str) -> str:
 
 
 def normalize_course_canonical(s: str) -> str:
-    """Normalize course for matching, stripping leading zeros in the number part (e.g. MAT021A -> mat21a)."""
-    c = normalize_course(s)
-    if not c:
-        return c
-    m = _CANONICAL_COURSE_RE.match(c)
-    if m:
-        return m.group(1) + m.group(3)
-    return c
+    """Normalize course for matching, using a stable 3-digit padded number key.
+
+    Examples:
+    - "ECS 36C" -> "ecs036c"
+    - "ECS036C - Data Structures" -> "ecs036c"
+    - "MAT 21A" -> "mat021a"
+    """
+
+    def _parse_course_token(raw: str) -> tuple[str, str, str] | None:
+        t = normalize_text(raw)
+        if not t:
+            return None
+        # Keep letters/digits/spaces so we can ignore trailing course names cleanly.
+        t = re.sub(r"[^0-9a-z ]+", " ", t)
+        t = _WHITESPACE_RE.sub(" ", t).strip()
+        m = _COURSE_TOKEN_RE.match(t)
+        if not m:
+            return None
+        dept, digits, suffix = m.group(1), m.group(2), m.group(3)
+        if not dept or not digits:
+            return None
+        return dept, digits, suffix or ""
+
+    parsed = _parse_course_token(s)
+    if not parsed:
+        return normalize_course(s)
+
+    dept, digits, suffix = parsed
+    # Pad to 3 digits when the numeric part is 1–2 digits; keep longer numbers as-is.
+    try:
+        n = int(digits)
+        digits_norm = str(n).zfill(3) if n < 1000 else str(n)
+    except Exception:
+        digits_norm = digits.zfill(3) if len(digits) < 3 else digits
+
+    return f"{dept}{digits_norm}{suffix}"
 
 
 @dataclass(frozen=True)
@@ -93,23 +122,65 @@ def top_matches(
 
 def course_variants(user_course: str) -> list[str]:
     """Generate a few likely DB substrings for Supabase ilike/or filters."""
+    def _parse_course_token(raw: str) -> tuple[str, str, str] | None:
+        t = normalize_text(raw)
+        if not t:
+            return None
+        t = re.sub(r"[^0-9a-z ]+", " ", t)
+        t = _WHITESPACE_RE.sub(" ", t).strip()
+        m = _COURSE_TOKEN_RE.match(t)
+        if not m:
+            return None
+        dept, digits, suffix = m.group(1), m.group(2), m.group(3)
+        if not dept or not digits:
+            return None
+        return dept, digits, suffix or ""
+
+    parsed = _parse_course_token(user_course)
     c = normalize_course(user_course)
-    if not c:
+    if not c and not parsed:
         return []
 
-    # Attempt to split into dept letters + rest
-    m = re.match(r"^([a-z]+)([0-9].*)$", c)
-    variants: set[str] = set()
-    variants.add(c)
-    if m:
-        dept = m.group(1)
-        num = m.group(2)
-        variants.add(f"{dept}{num}")
-        variants.add(f"{dept} {num}")
-        variants.add(dept)
-        # Include number-only so we match DB rows with course "21A" when user says "MAT 21A"
-        variants.add(num)
-    return sorted(variants)
+    # Preserve ordering: most specific -> least specific.
+    out: list[str] = []
+    seen: set[str] = set()
+
+    def _add(v: str) -> None:
+        v2 = (v or "").strip()
+        if not v2 or v2 in seen:
+            return
+        seen.add(v2)
+        out.append(v2)
+
+    if parsed:
+        dept, digits_raw, suffix = parsed
+        # Compute padded + unpadded numbers for matching mixed storage.
+        try:
+            n = int(digits_raw)
+            digits_unpadded = str(n)
+        except Exception:
+            digits_unpadded = digits_raw.lstrip("0") or "0"
+        digits_padded = digits_unpadded.zfill(3) if len(digits_unpadded) < 3 else digits_unpadded
+
+        token_padded = f"{dept}{digits_padded}{suffix}"
+        token_unpadded = f"{dept}{digits_unpadded}{suffix}"
+
+        # Full token variants (no-space + space between dept/number).
+        _add(token_padded)
+        _add(f"{dept} {digits_padded}{suffix}")
+        _add(token_unpadded)
+        _add(f"{dept} {digits_unpadded}{suffix}")
+
+        # Number-only variants (helps if DB has "36C" or "036C" without dept).
+        _add(f"{digits_padded}{suffix}")
+        _add(f"{digits_unpadded}{suffix}")
+
+        # Dept-only fallback.
+        _add(dept)
+
+    # Keep legacy behavior as a last resort: normalized alnum-only whole input.
+    _add(c)
+    return out
 
 
 def normalize_many(values: Iterable[str]) -> list[str]:
