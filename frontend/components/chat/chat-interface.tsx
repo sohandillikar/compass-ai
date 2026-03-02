@@ -107,7 +107,13 @@ export function ChatInterface() {
               </div>
             </div>
           )}
-          {messages.map((msg, i) => (
+          {messages
+            .filter(
+              (msg) =>
+                msg.role !== "assistant" ||
+                (msg.content ?? "").trim() !== ""
+            )
+            .map((msg, i) => (
             <div
               key={i}
               className={cn(

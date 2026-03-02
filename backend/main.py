@@ -36,14 +36,49 @@ class ChatResponse(BaseModel):
 
 
 def _to_api_messages(lc_messages) -> list[ChatMessage]:
-    """Convert LangChain message objects to API format."""
+    """Convert LangChain message objects to API format.
+
+    The LangChain agent may emit intermediate AI messages that only contain
+    tool-call metadata or other non-user-facing content. Those should not be
+    exposed to the frontend as visible assistant messages, otherwise they
+    render as empty bubbles in the UI.
+    """
+
+    def _extract_text_content(msg) -> str:
+        """Best-effort extraction of displayable text from a LangChain message."""
+        content = getattr(msg, "content", "")
+        # Common case: simple string content
+        if isinstance(content, str):
+            return content
+
+        # Newer LangChain messages may use a list of content blocks
+        parts: list[str] = []
+        if isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict):
+                    text = part.get("text")
+                    if isinstance(text, str):
+                        parts.append(text)
+                elif isinstance(part, str):
+                    parts.append(part)
+        elif content is not None:
+            # Fallback: stringify unknown structures
+            parts.append(str(content))
+
+        return "\n".join(parts)
+
     out: list[ChatMessage] = []
     for msg in lc_messages:
         msg_type = getattr(msg, "type", None) or type(msg).__name__
         if msg_type in ("human", "HumanMessage"):
-            out.append(ChatMessage(role="user", content=msg.content))
+            text = _extract_text_content(msg)
+            out.append(ChatMessage(role="user", content=text))
         elif msg_type in ("ai", "AIMessage"):
-            out.append(ChatMessage(role="assistant", content=msg.content))
+            text = _extract_text_content(msg)
+            # Skip AI messages that have no displayable text (e.g. tool calls)
+            if not text or not text.strip():
+                continue
+            out.append(ChatMessage(role="assistant", content=text))
     return out
 
 
