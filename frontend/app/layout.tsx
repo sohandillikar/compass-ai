@@ -23,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${aggieSans.variable} antialiased`}>
+      <body className={`${aggieSans.variable} antialiased min-h-dvh overflow-hidden`}>
         {children}
       </body>
     </html>
