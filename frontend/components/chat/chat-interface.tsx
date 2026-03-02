@@ -5,7 +5,6 @@ import Image from "next/image";
 import { Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { chat, type ChatMessage } from "@/lib/api";
@@ -60,7 +59,7 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <header className="shrink-0 border-b border-border/50 bg-background/80 px-6 py-4 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <Image
@@ -79,7 +78,7 @@ export function ChatInterface() {
         </div>
       </header>
 
-      <ScrollArea className="flex-1 px-6 py-4">
+      <div className="flex-1 overflow-y-auto px-6 py-4">
         <div className="flex flex-col gap-4">
           {messages.length === 0 && (
             <div className="flex flex-col items-center gap-6 py-12">
@@ -136,7 +135,7 @@ export function ChatInterface() {
           )}
           <div ref={scrollRef} />
         </div>
-      </ScrollArea>
+      </div>
 
       {error && (
         <div className="shrink-0 border-t border-destructive/30 bg-destructive/10 px-6 py-2">
