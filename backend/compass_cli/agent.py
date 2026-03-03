@@ -13,6 +13,7 @@ from compass_cli.tools import (
     recommend_professors_for_course,
     search_departments,
     search_professors,
+    semantic_search_reviews,
 )
 
 
@@ -29,6 +30,9 @@ Rules:
 - If the user asks about a professor by name, call get_professor_profile.
 - If you are unsure about a department name/code, call search_departments.
 - If the user names a professor but might have a typo, call search_professors first.
+- For open-ended or subjective questions about teaching style, student experience, or qualitative traits (e.g. "professors who explain well", "engaging lecturers", "tough but fair grading", "best office hours"), call semantic_search_reviews. This tool finds reviews by meaning, not exact text match.
+- You may combine semantic_search_reviews with recommend_professors_for_course or get_professor_profile for richer, more evidence-backed answers.
+- Prefer structured tools (recommend_professors_for_course, get_professor_profile) for factual queries about ratings, difficulty, or specific courses. Use semantic_search_reviews when the question is about subjective qualities or when you need to find relevant student comments.
 - If a tool returns an error "Database unreachable" or "Database error", tell the user the database could not be reached and to check their internet and Supabase configuration; do not say you could not find recommendations.
 - When recommend_professors_for_course returns results (a non-empty results list), you MUST summarize the top options with evidence (review count, average rating, difficulty, take-again %, and 1–2 sample comments). If review counts are low, mention that the evidence is sparse, but still present the best-available ranking.
 - Only say there is “not enough data” if recommend_professors_for_course returns an error (e.g. "No matching reviews found for that course.") or an empty results list.
@@ -54,6 +58,7 @@ def build_agent(model_name: str | None = None):
         search_professors,
         get_professor_profile,
         recommend_professors_for_course,
+        semantic_search_reviews,
     ]
 
     return create_agent(model, tools=tools, system_prompt=SYSTEM_PROMPT)

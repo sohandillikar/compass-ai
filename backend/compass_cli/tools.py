@@ -10,6 +10,7 @@ import httpx
 from langchain.tools import tool
 
 from compass_cli.db import get_supabase_client
+from compass_cli.embeddings import get_embedding
 from compass_cli.fuzzy import Match, best_match, course_variants, normalize_course, normalize_course_canonical, normalize_text, top_matches
 
 
@@ -425,4 +426,80 @@ def recommend_professors_for_course(
             "Database error",
             f"{type(e).__name__}: {e}. Check Supabase configuration.",
         )
+
+
+@tool
+def semantic_search_reviews(query: str, limit: int = 10, threshold: float = 0.5) -> str:
+    """Search professor reviews by meaning using semantic similarity.
+
+    Use this for open-ended questions about teaching style, student experience,
+    or subjective topics (e.g. "professors who explain well", "engaging
+    lecturers", "tough but fair grading").
+    """
+    try:
+        query_embedding = get_embedding(query)
+    except Exception as e:
+        return _db_error_payload(
+            "Embedding error",
+            f"Could not embed query: {type(e).__name__}: {e}",
+        )
+
+    try:
+        supabase = get_supabase_client()
+        resp = supabase.rpc(
+            "match_reviews",
+            {
+                "query_embedding": query_embedding,
+                "match_threshold": threshold,
+                "match_count": limit,
+            },
+        ).execute()
+        matches = list(resp.data or [])
+    except (httpx.ConnectError, httpx.ConnectTimeout, OSError) as e:
+        return _db_error_payload(
+            "Database unreachable",
+            f"{type(e).__name__}: {e}. Check internet and Supabase.",
+        )
+    except Exception as e:
+        return _db_error_payload("Database error", f"{type(e).__name__}: {e}.")
+
+    if not matches:
+        return _json(
+            {
+                "query": query,
+                "results": [],
+                "note": "No semantically similar reviews found. Try rephrasing or lowering the threshold.",
+            }
+        )
+
+    try:
+        professors = _fetch_professors()
+        prof_by_id = {p.id: p for p in professors}
+    except Exception:
+        prof_by_id = {}
+
+    results: list[dict[str, Any]] = []
+    for m in matches:
+        prof = prof_by_id.get(str(m.get("professor_id")))
+        results.append(
+            {
+                "professor_name": prof.name if prof else None,
+                "professor_id": m.get("professor_id"),
+                "course": m.get("course"),
+                "comment": m.get("comment"),
+                "rating": m.get("rating"),
+                "difficulty": m.get("difficulty"),
+                "tags": m.get("tags"),
+                "similarity": round(float(m.get("similarity", 0)), 4),
+                "overall_rating": prof.overall_rating if prof else None,
+                "profile_url": prof.profile_url if prof else None,
+            }
+        )
+
+    return _json(
+        {
+            "query": query,
+            "results": results,
+        }
+    )
 
