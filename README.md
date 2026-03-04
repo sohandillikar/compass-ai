@@ -97,3 +97,5 @@ The following is a list of example requests that Compass can handle:
 3. Make your changes with detailed commit messages
 4. Create a PR with a descriptive title and description
 5. Apply and respond to feedback
+
+hi
