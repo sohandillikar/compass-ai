@@ -56,13 +56,21 @@ def _print_startup_help() -> None:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(sys.argv[1:] if argv is None else argv)
     agent = build_agent(model_name=args.model)
+    handler = getattr(agent, "_compass_tool_logging_handler", None)
+    attached = bool(getattr(agent, "_compass_tool_logging_attached", False))
 
     if not _check_supabase_reachable():
         print("Warning: Could not reach Supabase. Course/professor lookups may fail.", file=sys.stderr)
 
     if args.once:
         try:
-            result = agent.invoke({"messages": [{"role": "user", "content": args.once}]})
+            if handler is not None and not attached:
+                result = agent.invoke(
+                    {"messages": [{"role": "user", "content": args.once}]},
+                    config={"callbacks": [handler]},
+                )
+            else:
+                result = agent.invoke({"messages": [{"role": "user", "content": args.once}]})
         except Exception as e:
             err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
             print(f"Error: {err_msg}", file=sys.stderr)
@@ -90,7 +98,13 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         try:
-            result = agent.invoke({"messages": [{"role": "user", "content": user_text}]})
+            if handler is not None and not attached:
+                result = agent.invoke(
+                    {"messages": [{"role": "user", "content": user_text}]},
+                    config={"callbacks": [handler]},
+                )
+            else:
+                result = agent.invoke({"messages": [{"role": "user", "content": user_text}]})
         except Exception as e:  # e.g. httpx.ConnectError, OpenAI errors
             err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
             print(f"Error: {err_msg}")

@@ -1,6 +1,7 @@
 # CLI agent + API server
 langchain
 langchain-openai
+openai
 supabase
 python-dotenv
 rapidfuzz
