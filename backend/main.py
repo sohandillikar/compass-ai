@@ -131,7 +131,12 @@ def chat(request: ChatRequest):
 
     try:
         agent = app.state.agent
-        result = agent.invoke({"messages": lc_input})
+        handler = getattr(agent, "_compass_tool_logging_handler", None)
+        attached = bool(getattr(agent, "_compass_tool_logging_attached", False))
+        if handler is not None and not attached:
+            result = agent.invoke({"messages": lc_input}, config={"callbacks": [handler]})
+        else:
+            result = agent.invoke({"messages": lc_input})
     except Exception as e:
         err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
         raise HTTPException(

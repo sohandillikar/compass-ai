@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 
+from compass_cli.tool_logging import ToolCallPrintHandler
 from compass_cli.tools import (
     get_professor_profile,
     recommend_professors_for_course,
@@ -61,5 +62,23 @@ def build_agent(model_name: str | None = None):
         semantic_search_reviews,
     ]
 
-    return create_agent(model, tools=tools, system_prompt=SYSTEM_PROMPT)
+    agent = create_agent(model, tools=tools, system_prompt=SYSTEM_PROMPT)
+
+    handler = ToolCallPrintHandler()
+    try:
+        # Preferred: attach callbacks at construction time so both CLI & API get it.
+        agent = agent.with_config({"callbacks": [handler]})
+        try:
+            setattr(agent, "_compass_tool_logging_attached", True)
+        except Exception:
+            pass
+    except Exception:
+        # Fallback: callers may pass callbacks via invoke config.
+        try:
+            setattr(agent, "_compass_tool_logging_attached", False)
+            setattr(agent, "_compass_tool_logging_handler", handler)
+        except Exception:
+            pass
+
+    return agent
 
